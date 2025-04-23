@@ -1,50 +1,48 @@
-# Welcome to your Expo app 👋
+# RapidTriage App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A cross-platform medical triage application with voice input and nearby hospitals functionality.
 
-## Get started
+## Features
+
+- Symptom Assessment
+  - Text and voice input for symptoms
+  - Duration selection
+  - Pain level rating
+  - Analysis results
+
+- Voice Recording
+  - Record symptom descriptions
+  - Automatic transcription to text
+  - Visual recording feedback
+
+- Nearby Hospitals
+  - Find hospitals close to your location
+  - Sort by rating and distance
+  - View hospitals on a map
+  - Get directions to hospital
+  - Call hospital or emergency services
+
+## Installation
 
 1. Install dependencies
+2. Configure API Keys
+- Open `src/utils/config.js`
+- Add your Google Places API key
 
-   ```bash
-   npm install
-   ```
+3. Start the app
+## Development
 
-2. Start the app
+This project uses:
+- React Native with Expo
+- React Navigation for routing
+- Expo AV for audio recording
+- React Native Maps for mapping
+- Google Places API for nearby hospitals
 
-   ```bash
-    npx expo start
-   ```
+## Integration with Backend
 
-In the output, you'll find options to open the app in a
+To integrate with your friend's backend:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. Update the API endpoints in `src/utils/config.js`
+2. Replace mock API calls in components with actual implementation
+3. Add any additional authentication needed

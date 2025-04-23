@@ -1,41 +1,40 @@
 {
   "expo": {
     "name": "RapidTriageApp",
-    "slug": "RapidTriageApp",
+    "slug": "rapid-triage-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app uses the microphone to record your symptom descriptions for analysis.",
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to find nearby hospitals and medical facilities.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location to find nearby hospitals and medical facilities."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
-      "expo-router",
       [
-        "expo-splash-screen",
+        "expo-av",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "microphonePermission": "Allow RapidTriage to access your microphone."
         }
       ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    ]
   }
 }
