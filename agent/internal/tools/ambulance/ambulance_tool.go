@@ -2,7 +2,6 @@ package ambulance
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -87,81 +86,18 @@ func (t *AmbulanceTool) Name() string {
 
 // IsApplicable determines if this tool is applicable for the given emergency
 func (t *AmbulanceTool) IsApplicable(situation *models.EmergencySituation) bool {
-	// Ambulance is applicable for urgent cases that require transport
-	return situation.Code == models.CodeRed || situation.Code == models.CodeYellow
+	// Ambulance is only applicable for critical (RED) cases
+	return situation.Code == models.CodeRed && situation.Location != nil
 }
 
 // Execute dispatches an ambulance to the emergency location
 func (t *AmbulanceTool) Execute(ctx context.Context, situation *models.EmergencySituation) (*tools.ToolResponse, error) {
-	// Check if location is available
-	if situation.Location == nil {
-		return nil, fmt.Errorf("cannot dispatch ambulance: location information missing")
-	}
-
-	// Prepare dispatch request
-	payload := map[string]interface{}{
-		"emergency_id": situation.ID,
-		"code":         string(situation.Code),
-		"location": map[string]interface{}{
-			"latitude":  situation.Location.Latitude,
-			"longitude": situation.Location.Longitude,
-			"address":   situation.Location.Address,
-		},
-		"description": situation.Description,
-		"timestamp":   situation.Timestamp.Format(time.RFC3339),
-	}
-
-	if situation.PatientInfo != nil {
-		payload["patient_info"] = situation.PatientInfo
-	}
-
-	// Convert payload to JSON
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
-	}
-
-	// Prepare request
-	req := &HTTPRequest{
-		Method: "POST",
-		URL:    t.config.APIEndpoint + "/dispatch",
-		Body:   body,
-		Headers: map[string]string{
-			"Content-Type":  "application/json",
-			"Authorization": "Bearer " + t.config.APIKey,
-			"X-Priority":    getPriorityFromCode(situation.Code),
-		},
-	}
-
-	// Send request with retries
-	var resp *HTTPResponse
-	var lastErr error
-
-	for attempt := 0; attempt < t.config.RetryAttempts; attempt++ {
-		resp, lastErr = t.client.Do(req)
-		if lastErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			break
-		}
-
-		// Exponential backoff
-		time.Sleep(time.Duration(attempt*attempt) * 100 * time.Millisecond)
-	}
-
-	if lastErr != nil {
-		return nil, fmt.Errorf("failed to communicate with ambulance service: %w", lastErr)
-	}
-
-	// Parse response
-	var responseData map[string]string
-	if err := json.Unmarshal(resp.Body, &responseData); err != nil {
-		return nil, fmt.Errorf("failed to parse ambulance service response: %w", err)
-	}
-
+	// For now, just return a placeholder message as requested
 	return &tools.ToolResponse{
 		ToolName:  t.Name(),
 		Success:   true,
-		Message:   "Successfully dispatched ambulance to the location",
-		Data:      responseData,
+		Message:   "Called Ambulance Dispatch Tool",
+		Data:      map[string]string{},
 		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil
 }

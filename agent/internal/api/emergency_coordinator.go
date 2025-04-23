@@ -85,43 +85,31 @@ func (c *EmergencyCoordinator) ProcessEmergency(ctx context.Context, situation *
 		situation.SetTriageCode(code, confidence)
 	}
 
-	// Find nearby hospitals and ambulances
-	var nearestHospitals []location.Facility
-	var nearestAmbulances []location.Facility
+	// Initialize response variables
 	var toolResponses []*tools.ToolResponse
-	var responseErr error
 
-	if situation.Location != nil {
-		// Get nearest hospitals
-		nearestHospitals, responseErr = c.locationTool.GetNearestHospitals(ctx, situation.Location, 3)
+	// Process emergency based on triage code
+	switch situation.Code {
+	case models.CodeRed:
+		// For critical cases, call both hospital and ambulance tools
+		responseErr := c.processRedEmergency(ctx, situation, &toolResponses)
 		if responseErr != nil {
-			// Log but continue
-			fmt.Printf("Warning: failed to get nearest hospitals: %v\n", responseErr)
+			fmt.Printf("Warning: error in processing RED emergency: %v\n", responseErr)
 		}
-
-		// Get nearest ambulances for higher priority cases
-		if situation.Code == models.CodeRed || situation.Code == models.CodeYellow {
-			nearestAmbulances, responseErr = c.locationTool.GetNearestAmbulances(ctx, situation.Location, 2)
-			if responseErr != nil {
-				// Log but continue
-				fmt.Printf("Warning: failed to get nearest ambulances: %v\n", responseErr)
-			}
+	case models.CodeYellow:
+		// For urgent cases, call hospital tool only
+		responseErr := c.processYellowEmergency(ctx, situation, &toolResponses)
+		if responseErr != nil {
+			fmt.Printf("Warning: error in processing YELLOW emergency: %v\n", responseErr)
 		}
-	}
-
-	// Get applicable tools
-	applicableTools := c.toolRegistry.GetApplicable(situation)
-
-	// Execute tools and collect responses
-	for _, tool := range applicableTools {
-		toolResponse, err := tool.Execute(ctx, situation)
-		if err != nil {
-			// Log error but continue with other tools
-			fmt.Printf("Warning: tool %s failed: %v\n", tool.Name(), err)
-			continue
+	case models.CodeGreen:
+		// For non-urgent cases, call booking tool
+		responseErr := c.processGreenEmergency(ctx, situation, &toolResponses)
+		if responseErr != nil {
+			fmt.Printf("Warning: error in processing GREEN emergency: %v\n", responseErr)
 		}
-
-		toolResponses = append(toolResponses, toolResponse)
+	default:
+		fmt.Printf("Warning: unknown emergency code: %s\n", situation.Code)
 	}
 
 	// Generate a summary for responders
@@ -141,15 +129,90 @@ func (c *EmergencyCoordinator) ProcessEmergency(ctx context.Context, situation *
 		ToolResponses: toolResponses,
 	}
 
-	if len(nearestHospitals) > 0 {
-		response.NearestHospitals = nearestHospitals
-	}
-
-	if len(nearestAmbulances) > 0 {
-		response.NearestAmbulances = nearestAmbulances
-	}
-
 	return response, nil
+}
+
+// processRedEmergency handles critical emergencies (Code Red)
+func (c *EmergencyCoordinator) processRedEmergency(ctx context.Context, situation *models.EmergencySituation, toolResponses *[]*tools.ToolResponse) error {
+	// Get all tools that are applicable for this situation
+	applicableTools := c.toolRegistry.GetApplicable(situation)
+
+	// Find and execute hospital and ambulance tools
+	for _, tool := range applicableTools {
+		toolName := tool.Name()
+		if isHospitalOrAmbulanceTool(toolName) {
+			toolResponse, err := tool.Execute(ctx, situation)
+			if err != nil {
+				// Log error but continue with other tools
+				fmt.Printf("Warning: tool %s failed: %v\n", toolName, err)
+				continue
+			}
+			*toolResponses = append(*toolResponses, toolResponse)
+		}
+	}
+
+	return nil
+}
+
+// processYellowEmergency handles urgent cases (Code Yellow)
+func (c *EmergencyCoordinator) processYellowEmergency(ctx context.Context, situation *models.EmergencySituation, toolResponses *[]*tools.ToolResponse) error {
+	// Get all tools that are applicable for this situation
+	applicableTools := c.toolRegistry.GetApplicable(situation)
+
+	// Execute only hospital tool
+	for _, tool := range applicableTools {
+		toolName := tool.Name()
+		if isHospitalTool(toolName) {
+			toolResponse, err := tool.Execute(ctx, situation)
+			if err != nil {
+				fmt.Printf("Warning: hospital tool failed: %v\n", err)
+				return err
+			}
+			*toolResponses = append(*toolResponses, toolResponse)
+			break // Only need one hospital tool
+		}
+	}
+
+	return nil
+}
+
+// processGreenEmergency handles non-urgent cases (Code Green)
+func (c *EmergencyCoordinator) processGreenEmergency(ctx context.Context, situation *models.EmergencySituation, toolResponses *[]*tools.ToolResponse) error {
+	// Get all tools that are applicable for this situation
+	applicableTools := c.toolRegistry.GetApplicable(situation)
+
+	// Execute only booking tool
+	for _, tool := range applicableTools {
+		toolName := tool.Name()
+		if isBookingTool(toolName) {
+			toolResponse, err := tool.Execute(ctx, situation)
+			if err != nil {
+				fmt.Printf("Warning: booking tool failed: %v\n", err)
+				return err
+			}
+			*toolResponses = append(*toolResponses, toolResponse)
+			break // Only need one booking tool
+		}
+	}
+
+	return nil
+}
+
+// Helper functions to identify tool types
+func isHospitalTool(toolName string) bool {
+	return toolName == "Hospital Communication Tool"
+}
+
+func isAmbulanceTool(toolName string) bool {
+	return toolName == "Ambulance Dispatch Tool"
+}
+
+func isBookingTool(toolName string) bool {
+	return toolName == "Hospital Booking Tool"
+}
+
+func isHospitalOrAmbulanceTool(toolName string) bool {
+	return isHospitalTool(toolName) || isAmbulanceTool(toolName)
 }
 
 // EmergencyResponse represents the coordinated emergency response

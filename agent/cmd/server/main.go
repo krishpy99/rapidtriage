@@ -15,6 +15,7 @@ import (
 	"agent/internal/config"
 	"agent/internal/tools"
 	"agent/internal/tools/ambulance"
+	"agent/internal/tools/booking"
 	"agent/internal/tools/hospital"
 	"agent/internal/tools/location"
 	"agent/internal/triage"
@@ -99,6 +100,7 @@ func setupComponents() (*Components, error) {
 	locationTool := createLocationTool(httpClient)
 	hospitalTool := createHospitalTool(httpClient)
 	ambulanceTool := createAmbulanceTool(httpClient)
+	bookingTool := createBookingTool(httpClient)
 
 	// Register tools with registry
 	if err := toolRegistry.Register(locationTool); err != nil {
@@ -109,6 +111,9 @@ func setupComponents() (*Components, error) {
 	}
 	if err := toolRegistry.Register(ambulanceTool); err != nil {
 		return nil, fmt.Errorf("failed to register ambulance tool: %w", err)
+	}
+	if err := toolRegistry.Register(bookingTool); err != nil {
+		return nil, fmt.Errorf("failed to register booking tool: %w", err)
 	}
 
 	// Create classifier
@@ -122,6 +127,12 @@ func setupComponents() (*Components, error) {
 	audioProcessor, err := createAudioProcessor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audio processor: %w", err)
+	}
+
+	// Create text processor with AI model configuration
+	textProcessor, err := createTextProcessor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create text processor: %w", err)
 	}
 
 	// Create summary generator
@@ -147,9 +158,9 @@ func setupComponents() (*Components, error) {
 		coordinatorConfig,
 	)
 
-	// Create API handler
+	// Create API handler with both audio and text processors
 	maxSize := config.GetInt("MAX_AUDIO_SIZE_MB", 20) * 1024 * 1024
-	emergencyHandler := api.NewEmergencyHandler(audioProcessor, coordinator, int64(maxSize))
+	emergencyHandler := api.NewEmergencyHandler(audioProcessor, textProcessor, coordinator, int64(maxSize))
 
 	// Create and configure HTTP mux
 	mux := http.NewServeMux()
@@ -227,6 +238,68 @@ func createAudioProcessor() (*api.AudioProcessor, error) {
 	return api.NewAudioProcessor(modelConfig)
 }
 
+// createTextProcessor creates and configures a text processor with AI models
+func createTextProcessor() (*api.TextProcessor, error) {
+	// Get model configuration from environment (reusing same config as audio processor)
+	modelTypeStr := config.Get("AI_MODEL_TYPE", "gemini")
+	var modelType ai.ModelType
+	switch modelTypeStr {
+	case "gemini", "GEMINI":
+		modelType = ai.ModelGemini
+	case "claude", "CLAUDE":
+		modelType = ai.ModelClaude
+	case "gpt4", "GPT4", "openai", "OPENAI":
+		modelType = ai.ModelGPT4
+	case "llama", "LLAMA":
+		modelType = ai.ModelLlama
+	default:
+		modelType = ai.ModelGemini
+	}
+
+	// Set up text processor configuration
+	modelConfig := api.TextProcessorConfig{
+		ModelEndpoint: config.Get("AI_MODEL_ENDPOINT", ""),
+		APIKey:        config.Get("AI_MODEL_API_KEY", ""),
+		ModelType:     modelType,
+		ModelName:     config.Get("AI_MODEL_NAME", ""),
+		Timeout:       time.Duration(config.GetInt("API_TIMEOUT_SECONDS", 30)) * time.Second,
+		Temperature:   0.7,
+		MaxTokens:     4096,
+	}
+
+	// Use model-specific environment variables if the general ones aren't set
+	if modelConfig.ModelEndpoint == "" {
+		switch modelType {
+		case ai.ModelGemini:
+			modelConfig.ModelEndpoint = config.Get("GEMINI_ENDPOINT", "https://generativelanguage.googleapis.com/v1")
+			if modelConfig.APIKey == "" {
+				modelConfig.APIKey = config.Get("GEMINI_API_KEY", "")
+			}
+			if modelConfig.ModelName == "" {
+				modelConfig.ModelName = config.Get("GEMINI_MODEL", "gemini-1.5-pro")
+			}
+		case ai.ModelClaude:
+			modelConfig.ModelEndpoint = config.Get("CLAUDE_ENDPOINT", "https://api.anthropic.com/v1/messages")
+			if modelConfig.APIKey == "" {
+				modelConfig.APIKey = config.Get("CLAUDE_API_KEY", "")
+			}
+			if modelConfig.ModelName == "" {
+				modelConfig.ModelName = config.Get("CLAUDE_MODEL", "claude-3-opus-20240229")
+			}
+		case ai.ModelGPT4:
+			modelConfig.ModelEndpoint = config.Get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
+			if modelConfig.APIKey == "" {
+				modelConfig.APIKey = config.Get("OPENAI_API_KEY", "")
+			}
+			if modelConfig.ModelName == "" {
+				modelConfig.ModelName = config.Get("OPENAI_MODEL", "gpt-4o")
+			}
+		}
+	}
+
+	return api.NewTextProcessor(modelConfig)
+}
+
 // createLocationTool creates and configures a location tool
 func createLocationTool(client *mockHTTPClient) *location.LocationTool {
 	config := location.Config{
@@ -280,6 +353,23 @@ func createAmbulanceTool(client *mockHTTPClient) *ambulance.AmbulanceTool {
 	return ambulance.NewAmbulanceTool(config, adapter)
 }
 
+// createBookingTool creates and configures a booking tool
+func createBookingTool(client *mockHTTPClient) *booking.BookingTool {
+	config := booking.Config{
+		APIEndpoint:   config.Get("BOOKING_API_ENDPOINT", "https://api.booking.example.com"),
+		APIKey:        config.Get("BOOKING_API_KEY", "mock-booking-api-key"),
+		Timeout:       time.Duration(config.GetInt("API_TIMEOUT_SECONDS", 30)) * time.Second,
+		RetryAttempts: 3,
+	}
+
+	// Create adapter to bridge universal client with tool-specific interface
+	adapter := &booking.UniversalClientAdapter{
+		UniversalClient: client,
+	}
+
+	return booking.NewBookingTool(config, adapter)
+}
+
 // mockHTTPClient is a placeholder implementation for demonstration
 type mockHTTPClient struct{}
 
@@ -302,6 +392,12 @@ func (c *mockHTTPClient) Do(req interface{}) (interface{}, error) {
 		return &ambulance.HTTPResponse{
 			StatusCode: 200,
 			Body:       []byte(`{"success":true,"ambulance_id":"ambulance-1","eta":"3 minutes"}`),
+			Headers:    map[string]string{"Content-Type": "application/json"},
+		}, nil
+	case *booking.HTTPRequest:
+		return &booking.HTTPResponse{
+			StatusCode: 200,
+			Body:       []byte(`{"success":true,"booking_id":"booking-1","status":"confirmed"}`),
 			Headers:    map[string]string{"Content-Type": "application/json"},
 		}, nil
 	default:
