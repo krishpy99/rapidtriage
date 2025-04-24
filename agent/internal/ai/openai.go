@@ -107,9 +107,9 @@ func (m *OpenAIModel) SupportedRequestTypes() []RequestType {
 // -- Request/Response Structures --
 
 type OpenAIMessage struct {
-	Role         string                 `json:"role"`
-	Content      interface{}            `json:"content,omitempty"` // Can be string or array of content parts
-	Name         string                 `json:"name,omitempty"`
+	Role         string      `json:"role"`
+	Content      interface{} `json:"content,omitempty"` // Can be string or array of content parts
+	Name         string      `json:"name,omitempty"`
 	FunctionCall *struct {
 		Name      string `json:"name"`
 		Arguments string `json:"arguments"`
@@ -129,12 +129,12 @@ type OpenAIImageContent struct {
 }
 
 type OpenAIChatRequest struct {
-	Model       string          `json:"model"`
-	Messages    []OpenAIMessage `json:"messages"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
-	Functions   interface{}     `json:"functions,omitempty"`      // Renamed from Tools
-	FunctionCall interface{}    `json:"function_call,omitempty"`  // Renamed from ToolChoice
+	Model        string          `json:"model"`
+	Messages     []OpenAIMessage `json:"messages"`
+	MaxTokens    int             `json:"max_tokens,omitempty"`
+	Temperature  float64         `json:"temperature,omitempty"`
+	Functions    interface{}     `json:"functions,omitempty"`     // Renamed from Tools
+	FunctionCall interface{}     `json:"function_call,omitempty"` // Renamed from ToolChoice
 }
 
 type OpenAIChatResponse struct {
@@ -542,14 +542,14 @@ func (m *OpenAIModel) transcribeAudio(ctx context.Context, audioData []byte, mim
 // ProcessTextWithJson processes a text prompt and returns structured JSON
 func (m *OpenAIModel) ProcessTextWithJson(ctx context.Context, prompt string, jsonSchema string) (*ModelResponse, error) {
 	url := fmt.Sprintf("%s/chat/completions", m.baseEndpoint)
-	
+
 	// Create function specification with correct format
 	functions := []map[string]interface{}{
 		{
-			"name": "generate_structured_data",
+			"name":        "generate_structured_data",
 			"description": "Generate structured data according to the provided schema",
 			"parameters": map[string]interface{}{
-				"type": "object",
+				"type":       "object",
 				"properties": json.RawMessage(jsonSchema),
 			},
 		},
@@ -596,7 +596,7 @@ func (m *OpenAIModel) ProcessTextWithJson(ctx context.Context, prompt string, js
 	}
 
 	// Debug output to help diagnose issues
-	fmt.Printf("DEBUG: Response from OpenAI: %+v\n", response)
+	fmt.Printf("DEBUG: Response from Model: %+v\n", response)
 
 	if len(response.Choices) == 0 {
 		return nil, fmt.Errorf("empty response from model when expecting function call")
@@ -607,7 +607,7 @@ func (m *OpenAIModel) ProcessTextWithJson(ctx context.Context, prompt string, js
 	if fc == nil {
 		return nil, fmt.Errorf("model did not call the function as expected")
 	}
-	
+
 	jsonStr := fc.Arguments
 
 	// Basic validation: Check if it's valid JSON

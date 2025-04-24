@@ -10,11 +10,69 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
-  Alert
+  Alert,
+  Animated
 } from 'react-native';
 import VoiceRecorder from '../components/VoiceRecorder';
 import LocationService from '../services/LocationService';
 import ChatService from '../services/ChatService';
+
+// Typing animation component to show when the system is processing
+const TypingIndicator = () => {
+  // Create three animated values for the dots
+  const dot1Opacity = useRef(new Animated.Value(0.3)).current;
+  const dot2Opacity = useRef(new Animated.Value(0.3)).current;
+  const dot3Opacity = useRef(new Animated.Value(0.3)).current;
+  
+  // Animation sequence
+  useEffect(() => {
+    const animate = () => {
+      // Reset values
+      dot1Opacity.setValue(0.3);
+      dot2Opacity.setValue(0.3);
+      dot3Opacity.setValue(0.3);
+      
+      // Create animation sequence
+      Animated.sequence([
+        // First dot
+        Animated.timing(dot1Opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        // Second dot
+        Animated.timing(dot2Opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        // Third dot
+        Animated.timing(dot3Opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => animate()); // Loop animation
+    };
+    
+    animate();
+    
+    return () => {
+      // Cleanup animations
+      dot1Opacity.stopAnimation();
+      dot2Opacity.stopAnimation();
+      dot3Opacity.stopAnimation();
+    };
+  }, []);
+  
+  return (
+    <View style={styles.typingIndicator}>
+      <Animated.Text style={[styles.typingDot, { opacity: dot1Opacity }]}>•</Animated.Text>
+      <Animated.Text style={[styles.typingDot, { opacity: dot2Opacity }]}>•</Animated.Text>
+      <Animated.Text style={[styles.typingDot, { opacity: dot3Opacity }]}>•</Animated.Text>
+    </View>
+  );
+};
 
 const EmergencyScreen = ({ navigation }) => {
   const [messages, setMessages] = useState([]);
@@ -226,14 +284,21 @@ const EmergencyScreen = ({ navigation }) => {
               )}
             </View>
           ) : (
-            <FlatList
-              data={messages}
-              renderItem={renderChatMessage}
-              keyExtractor={item => item.id}
-              contentContainerStyle={styles.messagesList}
-              ref={scrollViewRef}
-              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-            />
+            <>
+              <FlatList
+                data={messages}
+                renderItem={renderChatMessage}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.messagesList}
+                ref={scrollViewRef}
+                onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+              />
+              {isLoading && (
+                <View style={styles.typingContainer}>
+                  <TypingIndicator />
+                </View>
+              )}
+            </>
           )}
         </View>
         
@@ -420,6 +485,26 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  typingContainer: {
+    padding: 8,
+    marginLeft: 10,
+    alignSelf: 'flex-start',
+  },
+  typingIndicator: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomLeftRadius: 4,
+  },
+  typingDot: {
+    fontSize: 24,
+    marginHorizontal: 2,
+    color: '#0A2F52',
   },
 });
 
